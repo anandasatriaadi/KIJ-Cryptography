@@ -5,6 +5,23 @@
 
 using namespace std;
 
+void shiftRow(unsigned char input[4][4], int rowNumber) {
+    unsigned char tempRow[4];
+
+    for (int i = 0; i < 4; i++) {
+        tempRow[i] = input[rowNumber][(i + rowNumber) % 4];
+    }
+    for (int i = 0; i < 4; i++) {
+        input[rowNumber][i] = tempRow[i];
+    }
+}
+
+void shiftRows(unsigned char input[4][4]) {
+    for (int i = 1; i < 4; i++) {
+        shiftRow(input, i);
+    }
+}
+
 void mixColumns(unsigned char input[4][4]) {
     unsigned int mul_constant[4][4] = {
         {2, 3, 1, 1},
@@ -64,6 +81,15 @@ int main() {
         {0xf0, 0x2d, 0xad, 0xc5}
     };
     mixColumns(input);
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            printf("%2X ", input[i][j]);
+        }
+        cout << endl;
+    }
+    cout << endl;
+    
+    shiftRows(input);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             printf("%2X ", input[i][j]);
