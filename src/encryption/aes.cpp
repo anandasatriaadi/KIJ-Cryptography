@@ -1,11 +1,12 @@
-#include <string>
+#include <bitset>
 #include <cstring>
 #include <iostream>
-#include <bitset>
+#include <string>
 
 using namespace std;
 
-void shiftRow(unsigned char input[4][4], int rowNumber) {
+void shiftRow(unsigned char input[4][4], int rowNumber)
+{
     unsigned char tempRow[4];
 
     for (int i = 0; i < 4; i++) {
@@ -16,19 +17,20 @@ void shiftRow(unsigned char input[4][4], int rowNumber) {
     }
 }
 
-void shiftRows(unsigned char input[4][4]) {
+void shiftRows(unsigned char input[4][4])
+{
     for (int i = 1; i < 4; i++) {
         shiftRow(input, i);
     }
 }
 
-void mixColumns(unsigned char input[4][4]) {
+void mixColumns(unsigned char input[4][4])
+{
     unsigned int mul_constant[4][4] = {
         {2, 3, 1, 1},
         {1, 2, 3, 1},
         {1, 1, 2, 3},
-        {3, 1, 1, 2}
-    };
+        {3, 1, 1, 2}};
 
     unsigned char temp[4][4];
     memset(temp, 0, sizeof(temp));
@@ -41,17 +43,17 @@ void mixColumns(unsigned char input[4][4]) {
             unsigned char temp2 = 0;
             // cout << "|";
             for (int k = 0; k < 4; k++) {
-                if(mul_constant[j][k] == 1) {
+                if (mul_constant[j][k] == 1) {
                     temp2 ^= input[k][i];
                 } else {
                     // checks whether the leftmost bit is 1
-                    if(input[k][i] >= 0x80) {
+                    if (input[k][i] >= 0x80) {
                         temp2 ^= (input[k][i] << 1) ^ 0x1b;
                     } else {
                         temp2 ^= input[k][i] << 1;
                     }
 
-                    if(mul_constant[j][k] == 3) {
+                    if (mul_constant[j][k] == 3) {
                         temp2 ^= input[k][i];
                     }
                 }
@@ -67,19 +69,18 @@ void mixColumns(unsigned char input[4][4]) {
         }
         // cout << endl << endl;
     }
-    
+
     memcpy(input, temp, sizeof(temp));
-    
 }
 
 // AES main function for testing
-int main() {
+int main()
+{
     unsigned char input[4][4] = {
         {0xea, 0x04, 0x65, 0x85},
         {0x83, 0x45, 0x5d, 0x96},
         {0x5c, 0x33, 0x98, 0xb0},
-        {0xf0, 0x2d, 0xad, 0xc5}
-    };
+        {0xf0, 0x2d, 0xad, 0xc5}};
     mixColumns(input);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
@@ -88,7 +89,7 @@ int main() {
         cout << endl;
     }
     cout << endl;
-    
+
     shiftRows(input);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
