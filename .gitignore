@@ -2,3 +2,5 @@
 src/encryption/aes
 src/encryption/rc4
 src/encryption/des
+src/server/files
+src/client/files
