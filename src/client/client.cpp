@@ -6,8 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "../encryption/rc4.cpp"
 
-#include <filesystem>
+// #include <filesystem>
+#include <experimental/filesystem>
+
+// for brevity
+namespace filesystem = std::experimental::filesystem;
 #include <iostream>
 #include <string>
 
@@ -15,7 +20,7 @@ using namespace std;
 
 #define SIZE_BUF 100
 #define FILE_SEND_BUF 1024
-#define PORT 8000
+#define PORT 8888
 
 void recieveInput(const char *title, char str[]);
 void printWarn(const char *msg);
@@ -116,6 +121,7 @@ void sendEncrypt(int server)
     int i = 0, j = 0, from = 0, to = 10000;
 
     // If the file exists and has read permission
+    system("echo 'List of files '; ls -la files");
     recieveInput("Insert file name", fileName);
     sprintf(filePath, "./files/%s", fileName);
     fptr1 = fopen(filePath, "r");
@@ -134,52 +140,17 @@ void sendEncrypt(int server)
     send(server, to_string(fileSize).c_str(), FILE_SEND_BUF, 0);
 
     int counter = 0;
-    while (1) {
-        // Get the characters in bytes
-        fgetcReturn = fgetc(fptr1);
-        if (fgetcReturn == EOF) {
-            // for debugging pupose
-            for (int k = 0; k < 16; k++) {
-                counter++;
-                // printf("%2X ", buffer[k]);
-            }
-            // printf("\n");
 
-            // send remaining bytes
-            if (send(server, buffer, sizeof(buffer), 0) != -1) {
-                bzero(buffer, FILE_SEND_BUF);
-            }
-            break;
-        }
+    RC4 rc4_ecnrypt = RC4();
+    unsigned char data_buffer[FILE_SEND_BUF];
+    while (fread(data_buffer, sizeof(unsigned char), FILE_SEND_BUF, fptr1) > 0) {
+        // Encrypt the data
+        unsigned char *encrypted_data = (unsigned char *) malloc(FILE_SEND_BUF);
+        rc4_ecnrypt.encrypt(data_buffer, encrypted_data, FILE_SEND_BUF);
+        // Send the encrypted data
+        send(server, encrypted_data, FILE_SEND_BUF, 0);
+        free(encrypted_data);
+    }
 
-        c = fgetcReturn;
-        buffer[j] = c;
-        j++;
-        // send per 16 bytes
-        if (j % 16 == 0) {
-            // for debugging pupose
-            for (int k = 0; k < 16; k++) {
-                counter++;
-                // printf("%2X ", buffer[k]);
-            }
-            // printf("\n");
-
-            // send the bytes
-            j = 0;
-            if (send(server, buffer, sizeof(buffer), 0) != -1) {
-                bzero(buffer, FILE_SEND_BUF);
-            }
-        }
-
-        i++;
-    };
-
-    // print size of the bytes
-    // printf("counter = %d\n", counter);
-
-    // send finish flag
-    send(server, flag, FILE_SEND_BUF, 0);
-
-    // Close the file
     fclose(fptr1);
 }

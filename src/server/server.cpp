@@ -6,11 +6,12 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include "../encryption/rc4.cpp"
 
 #define MAX_CONNECTIONS 10
 #define SIZE_BUF 100
 #define FILE_SEND_BUF 1024
-#define PORT 8000
+#define PORT 8888
 
 // Pre-defined Functions
 int create_tcp_server_socket();
@@ -208,8 +209,6 @@ Receiving encrypted file
 void sendEncryptCommand(int client)
 {
     int ret_rec;
-    unsigned char data[FILE_SEND_BUF];
-    unsigned char flag[FILE_SEND_BUF] = "done";
     char fileName[FILE_SEND_BUF], fileSizeStr[FILE_SEND_BUF], filePath[FILE_SEND_BUF * 2];
 
     // receive file name
@@ -225,26 +224,31 @@ void sendEncryptCommand(int client)
     // make file
     FILE *newFile = fopen(filePath, "w+");
     int counter = 0;
+    uint total_bytes_received = 0;
+
+    RC4 rc4_decrypt = RC4();
+    unsigned char data_buffer[FILE_SEND_BUF];
     while (1) {
-        ret_rec = recv(client, data, FILE_SEND_BUF, 0);
+        bzero(data_buffer, FILE_SEND_BUF);
+        ret_rec = recv(client, data_buffer, FILE_SEND_BUF, 0);
         fflush(stdout);
         if (ret_rec != -1) {
-            // if client is done sending data
-            if (!memcmp(data, flag, FILE_SEND_BUF)) {
-                printf("counter = %d\n", counter);
+            // Decrypt the data
+            unsigned char *decrypted_data = (unsigned char *) malloc(FILE_SEND_BUF);
+            rc4_decrypt.encrypt(data_buffer, decrypted_data, FILE_SEND_BUF);
+            
+            if (total_bytes_received + ret_rec < fileSize) {
+                fwrite(decrypted_data, sizeof(char), ret_rec, newFile);
+                total_bytes_received += ret_rec;
+            } else {
+                fwrite(decrypted_data, sizeof(char), fileSize - total_bytes_received, newFile);
+                total_bytes_received += fileSize - total_bytes_received;
                 break;
             }
-            // for debugging purpose
-            for (int k = 0; k < 16; k++) {
-                fileSize--;
-                if (fileSize != 0) {
-                    fputc(data[k], newFile);
-                    printf("%c", data[k]);
-                    counter++;
-                }
-            }
+            
+            free(decrypted_data);
         }
-        bzero(data, FILE_SEND_BUF);
+        bzero(data_buffer, FILE_SEND_BUF);
     }
     fclose(newFile);
 }
