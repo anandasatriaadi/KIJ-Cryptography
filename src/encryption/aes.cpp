@@ -6,6 +6,12 @@
 
 using namespace std;
 
+#define DEBUG true
+#define _(x) if (DEBUG){cout << #x << " = [" << x << "]" << endl;}
+#define __(x) if (DEBUG){cout << #x << " = " << x << " ";}
+#define println(x) if (DEBUG){cout << x << endl;}
+#define print(x) if (DEBUG){cout << x;}
+
 class AES {
     private:
         const uint N_BLOCK      = 4;
@@ -14,6 +20,7 @@ class AES {
         const uint N_ROUND      = 10;
         unsigned char *IV = (unsigned char*)"B3TUTUG1L1M4NUK";
         unsigned char *KEY = (unsigned char*)"4Y4MB4K4RB3TUTU";
+        unsigned char *CBC_XORER = new unsigned char[BLOCK_LEN];
         // const unsigned char *IV = new unsigned char [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76];
         // const unsigned char *KEY = new unsigned char [0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8];
 
@@ -83,10 +90,15 @@ class AES {
         unsigned char *decryptECB(unsigned char *cipherText, uint lenCipherText);
         unsigned char *encryptCBC(unsigned char *plainText, uint lenPlainText);
         unsigned char *decryptCBC(unsigned char *cipherText, uint lenCipherText);
+
+        // More Utils
+        unsigned char *encryptCBC_Continous(unsigned char *plainText, uint lenPlainText);
+        unsigned char *decryptCBC_Continous(unsigned char *cipherText, uint lenCipherText);
+        void resetIV();
 };
     
 AES::AES() {
-
+    resetIV();
 }
 
 // ======== START ::: UTILITY FUNCTIONS ========
@@ -487,6 +499,56 @@ unsigned char *AES::decryptCBC(unsigned char *cipherText, uint lenCipherText){
     return decryptedCT;
 }
 
+void AES::resetIV(){
+    memcpy(CBC_XORER, IV, BLOCK_LEN);
+}
 
+void printHex(unsigned char *data, int len) {
+    for (int i = 0; i < len; i++) {
+        printf("%02X ", data[i]);
+    }
+    printf("\n");
+}
+
+unsigned char *AES::encryptCBC_Continous(unsigned char *plainText, uint lenPlainText){
+    // Copy plainText
+    unsigned char plainTextCopy[lenPlainText];
+    memcpy(plainTextCopy, plainText, sizeof(unsigned char) * lenPlainText);
+
+    unsigned char **keyRounds = generate2DUC(N_ROUND+1, N_BLOCK*4);
+    keyExpansion(KEY, keyRounds);
+
+    uint fix_len = uint(ceil(float(lenPlainText)/float(16))*16);
+    unsigned char *cipherText = new unsigned char[fix_len];
+    memset(cipherText, '\0', sizeof(unsigned char) * fix_len);
+    
+    unsigned char *temp = new unsigned char[BLOCK_LEN];
+    for(uint blockNum = 0; blockNum < fix_len/16; blockNum++){
+        xorBlock(plainTextCopy, blockNum, CBC_XORER);
+        encryptBlock(plainTextCopy, blockNum, keyRounds, cipherText, lenPlainText);
+        memcpy(CBC_XORER, cipherText + (blockNum * BLOCK_LEN), BLOCK_LEN);
+    }
+    
+    delete[] keyRounds;
+    return cipherText;
+}
+
+unsigned char *AES::decryptCBC_Continous(unsigned char *cipherText, uint lenCipherText){
+    unsigned char **keyRounds = generate2DUC(N_ROUND+1, N_BLOCK*4);
+    keyExpansion(KEY, keyRounds);
+
+    uint fix_len = uint(ceil(float(lenCipherText)/float(16))*16);
+    unsigned char *decryptedCT = new unsigned char[fix_len];
+    memset(decryptedCT, '\0', sizeof(unsigned char) * fix_len);
+
+    for(uint blockNum = 0; blockNum < fix_len/16; blockNum++){
+        decryptBlock(cipherText, blockNum, keyRounds, decryptedCT);
+        xorBlock(decryptedCT, blockNum, CBC_XORER);
+        memcpy(CBC_XORER, cipherText + (blockNum * BLOCK_LEN), BLOCK_LEN);
+    }
+    
+    delete[] keyRounds;
+    return decryptedCT;
+}
 
 // ======== END ::: OPERATION MODE ========
