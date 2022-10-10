@@ -10,6 +10,7 @@
 #define MAX_CONNECTIONS 10
 #define SIZE_BUF 100
 #define FILE_SEND_BUF 1024
+#define PORT 8000
 
 // Pre-defined Functions
 int create_tcp_server_socket();
@@ -168,7 +169,7 @@ int create_tcp_server_socket()
 
     /* Initialize the socket address structure */
     saddr.sin_family = AF_INET;
-    saddr.sin_port = htons(8000);
+    saddr.sin_port = htons(PORT);
     saddr.sin_addr.s_addr = INADDR_ANY;
 
     /* Step2: Bind the socket to port 7000 on the local host */
@@ -238,6 +239,7 @@ void sendEncryptCommand(int client)
                 fileSize--;
                 if (fileSize != 0) {
                     fputc(data[k], newFile);
+                    printf("%c", data[k]);
                     counter++;
                 }
             }

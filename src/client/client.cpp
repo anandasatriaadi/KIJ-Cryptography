@@ -15,6 +15,7 @@ using namespace std;
 
 #define SIZE_BUF 100
 #define FILE_SEND_BUF 1024
+#define PORT 8000
 
 void recieveInput(const char *title, char str[]);
 void printWarn(const char *msg);
@@ -37,7 +38,7 @@ int main()
 
     /* Let us initialize the server address structure */
     saddr.sin_family = AF_INET;
-    saddr.sin_port = htons(8000);
+    saddr.sin_port = htons(PORT);
     local_host = gethostbyname("127.0.0.1");
     saddr.sin_addr = *((struct in_addr *)local_host->h_addr);
     /* Step2: connect to the TCP server socket */

@@ -79,10 +79,10 @@ class AES {
 
         // The operation mode
         void xorBlock(unsigned char *blockA, uint blockNum, unsigned char blockB[]);
-        unsigned char* encryptECB(unsigned char *plainText, uint lenPlainText);
-        unsigned char* decryptECB(unsigned char *cipherText, uint lenCipherText);
-        unsigned char* encryptCBC(unsigned char *plainText, uint lenPlainText);
-        unsigned char* decryptCBC(unsigned char *cipherText, uint lenCipherText);
+        unsigned char *encryptECB(unsigned char *plainText, uint lenPlainText);
+        unsigned char *decryptECB(unsigned char *cipherText, uint lenCipherText);
+        unsigned char *encryptCBC(unsigned char *plainText, uint lenPlainText);
+        unsigned char *decryptCBC(unsigned char *cipherText, uint lenCipherText);
 };
     
 AES::AES() {
@@ -407,7 +407,7 @@ void AES::xorBlock(unsigned char *blockA, uint blockNum, unsigned char blockB[])
     }
 }
 
-unsigned char* AES::encryptECB(unsigned char *plainText, uint lenPlainText){
+unsigned char *AES::encryptECB(unsigned char *plainText, uint lenPlainText){
     uint fix_len = uint(ceil(float(lenPlainText)/float(16))*16);
     unsigned char *cipherText = new unsigned char[fix_len];
 
@@ -424,7 +424,7 @@ unsigned char* AES::encryptECB(unsigned char *plainText, uint lenPlainText){
     return cipherText;
 }
 
-unsigned char* AES::decryptECB(unsigned char *cipherText, uint lenCipherText){
+unsigned char *AES::decryptECB(unsigned char *cipherText, uint lenCipherText){
     unsigned char **keyRounds = generate2DUC(N_ROUND+1, N_BLOCK*4);
     keyExpansion(KEY, keyRounds);
     
@@ -440,7 +440,7 @@ unsigned char* AES::decryptECB(unsigned char *cipherText, uint lenCipherText){
     return decryptedCT;
 }
 
-unsigned char* AES::encryptCBC(unsigned char *plainText, uint lenPlainText){
+unsigned char *AES::encryptCBC(unsigned char *plainText, uint lenPlainText){
     // Copy plainText
     unsigned char plainTextCopy[lenPlainText];
     memcpy(plainTextCopy, plainText, sizeof(unsigned char) * lenPlainText);
@@ -466,7 +466,7 @@ unsigned char* AES::encryptCBC(unsigned char *plainText, uint lenPlainText){
     return cipherText;
 }
 
-unsigned char* AES::decryptCBC(unsigned char *cipherText, uint lenCipherText){
+unsigned char *AES::decryptCBC(unsigned char *cipherText, uint lenCipherText){
     unsigned char **keyRounds = generate2DUC(N_ROUND+1, N_BLOCK*4);
     keyExpansion(KEY, keyRounds);
 
