@@ -247,14 +247,14 @@ void sendEncryptCommand(int client)
 
     unsigned char data_buffer[FILE_SEND_BUF];
     chrono::steady_clock::time_point begin = chrono::steady_clock::now();
-    unsigned char *decrypted_data = (unsigned char *) malloc(FILE_SEND_BUF);
+    unsigned char decrypted_data[FILE_SEND_BUF];
     while (1) {
         bzero(data_buffer, FILE_SEND_BUF);
         ret_rec = recv(client, data_buffer, FILE_SEND_BUF, 0);
         fflush(stdout);
         if (ret_rec != -1) {
             // Decrypt the data
-            decrypted_data = des.decryptCBC_Continous(data_buffer, FILE_SEND_BUF);
+            des.decryptCBC_Continous(data_buffer, FILE_SEND_BUF, decrypted_data);
             
             if (total_bytes_received + ret_rec < fileSize) {
                 fwrite(decrypted_data, sizeof(char), ret_rec, newFile);
@@ -268,7 +268,6 @@ void sendEncryptCommand(int client)
         }
         bzero(data_buffer, FILE_SEND_BUF);
     }
-    free(decrypted_data);
     chrono::steady_clock::time_point end = chrono::steady_clock::now();
     fclose(newFile);
 
