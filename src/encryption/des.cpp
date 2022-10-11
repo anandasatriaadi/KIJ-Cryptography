@@ -11,6 +11,11 @@ class DES {
         unsigned char **compressedKeysBin;
         bool roundKeysGenerated;
         bool isDecrypting;
+        const uint BLOCK_LEN = 8;
+        
+        const unsigned char *KEY = (const unsigned char*)"4KUK0NT0";
+        unsigned char *IV = (unsigned char*)"0010000001111001011000010110111001100111001000000110001001100001";
+        unsigned char *CBC_XORER = new unsigned char[64];
 
         const int KEY_PARITY[56] = { 
             57, 49, 41, 33, 25, 17, 9,  1,  
@@ -117,44 +122,86 @@ class DES {
             34, 2,  42, 10, 50, 18, 58, 26, 
             33, 1,  41, 9,  49, 17, 57, 25
         };
-        
-        unsigned char *IV = (unsigned char*)"0010000001111001011000010110111001100111001000000110001001100001";
+        map<unsigned char, unsigned char *> MAP_HEX;
+        map<unsigned long, unsigned char> MAP_BIN;
         void generateSubKeys(const unsigned char *key);
 
     public:                                                                                             
         explicit DES();
         unsigned char *encryptBlock(unsigned char *plainText, const unsigned char *text);
-        unsigned char *encryptCBC(unsigned char *plainText, uint lenPlainText, const unsigned char *key);
-        unsigned char *decryptCBC(unsigned char *cipherText, uint lenCipherText, const unsigned char *key);
+        unsigned char *encryptCBC(unsigned char *plainText, uint lenPlainText);
+        unsigned char *decryptCBC(unsigned char *cipherText, uint lenCipherText);
+        unsigned char *encryptCBC_Continous(unsigned char *plainText, uint lenPlainText);
+        unsigned char *decryptCBC_Continous(unsigned char *cipherText, uint lenCipherText);
         void flipRoundKeys();
 
         // untility class for key encryption
-        unsigned char *hexToBinary(unsigned char *text); 
-        unsigned char *binaryToHex(unsigned char *text); 
-        unsigned char *permuteKeyWithParity(const unsigned char *text); 
-        unsigned char *shiftLeft(unsigned char *temp, int round);
-        unsigned char *permuteKeyWithKeyComposition(const unsigned char *text); 
-        unsigned char *permuteWithExpTab(unsigned char *text);
-        unsigned char *xorOperation(unsigned char *text1, unsigned char *text2, uint size);
-        unsigned char *permuteWithPermutationTab(const unsigned char *text);
-        unsigned char *permuteWithFinalPermutationTab(unsigned char *text);
+        void hexToBinary(unsigned char *text, unsigned char *res); 
+        void binaryToHex(unsigned char *text, unsigned char *res); 
+        void permuteKeyWithParity(const unsigned char *text, unsigned char *res); 
+        void shiftLeft(unsigned char *temp, int round);
+        void permuteKeyWithKeyComposition(const unsigned char *text, unsigned char *res); 
+        void permuteWithExpTab(unsigned char *text, unsigned char *res);
+        void xorOperation(unsigned char *text1, unsigned char *text2, uint size, unsigned char *res);
+        void permuteWithPermutationTab(const unsigned char *text, unsigned char *res);
+        void permuteWithFinalPermutationTab(unsigned char *text, unsigned char *res);
         unsigned char *decryptBlock(unsigned char *cipherText, const unsigned char *key);
 
         // Decrypt
-        unsigned char *permuteTextWithParity(const unsigned char *text);
+        void permuteTextWithParity(const unsigned char *text, unsigned char *res);
 
         // Utility class for text conversion
         unsigned char **generate2DUC(uint rows, uint col);
-        unsigned char *charToHex(const unsigned char *text);
-        unsigned char *hexToChar(unsigned char *text);
+        void charToHex(const unsigned char *text, unsigned char *res);
+        void hexToChar(unsigned char *text, unsigned char *res);
+        void resetIV();
 };
 
 DES::DES() {
     this->compressedKeysBin = generate2DUC(16, 48);
     this->isDecrypting = false;
+    resetIV();
+    
+    MAP_HEX['0'] = (unsigned char *)"0000";
+    MAP_HEX['1'] = (unsigned char *)"0001";
+    MAP_HEX['2'] = (unsigned char *)"0010";
+    MAP_HEX['3'] = (unsigned char *)"0011";
+    MAP_HEX['4'] = (unsigned char *)"0100";
+    MAP_HEX['5'] = (unsigned char *)"0101";
+    MAP_HEX['6'] = (unsigned char *)"0110";
+    MAP_HEX['7'] = (unsigned char *)"0111";
+    MAP_HEX['8'] = (unsigned char *)"1000";
+    MAP_HEX['9'] = (unsigned char *)"1001";
+    MAP_HEX['A'] = (unsigned char *)"1010";
+    MAP_HEX['B'] = (unsigned char *)"1011";
+    MAP_HEX['C'] = (unsigned char *)"1100";
+    MAP_HEX['D'] = (unsigned char *)"1101";
+    MAP_HEX['E'] = (unsigned char *)"1110";
+    MAP_HEX['F'] = (unsigned char *)"1111";
+    
+    MAP_BIN[0] = (unsigned char)'0';
+    MAP_BIN[1] = (unsigned char)'1';
+    MAP_BIN[2] = (unsigned char)'2';
+    MAP_BIN[3] = (unsigned char)'3';
+    MAP_BIN[4] = (unsigned char)'4';
+    MAP_BIN[5] = (unsigned char)'5';
+    MAP_BIN[6] = (unsigned char)'6';
+    MAP_BIN[7] = (unsigned char)'7';
+    MAP_BIN[8] = (unsigned char)'8';
+    MAP_BIN[9] = (unsigned char)'9';
+    MAP_BIN[10] = (unsigned char)'A';
+    MAP_BIN[11] = (unsigned char)'B';
+    MAP_BIN[12] = (unsigned char)'C';
+    MAP_BIN[13] = (unsigned char)'D';
+    MAP_BIN[14] = (unsigned char)'E';
+    MAP_BIN[15] = (unsigned char)'F';
 }
 
 /* ======== START ::: UTILITY METHOD ======== */
+void DES::resetIV(){
+    memcpy(CBC_XORER, IV, 64);
+}
+
 unsigned char ** DES::generate2DUC(uint rows, uint col){
     unsigned char **res; 
     res = new unsigned char *[rows];
@@ -164,179 +211,126 @@ unsigned char ** DES::generate2DUC(uint rows, uint col){
     return res;
 }
 
-unsigned char *DES::hexToBinary(unsigned char *text)
+void DES::hexToBinary(unsigned char *text, unsigned char *res)
 {
-    map<unsigned char, unsigned char *> map_hex;
-    map_hex['0'] = (unsigned char *)"0000";
-    map_hex['1'] = (unsigned char *)"0001";
-    map_hex['2'] = (unsigned char *)"0010";
-    map_hex['3'] = (unsigned char *)"0011";
-    map_hex['4'] = (unsigned char *)"0100";
-    map_hex['5'] = (unsigned char *)"0101";
-    map_hex['6'] = (unsigned char *)"0110";
-    map_hex['7'] = (unsigned char *)"0111";
-    map_hex['8'] = (unsigned char *)"1000";
-    map_hex['9'] = (unsigned char *)"1001";
-    map_hex['A'] = (unsigned char *)"1010";
-    map_hex['B'] = (unsigned char *)"1011";
-    map_hex['C'] = (unsigned char *)"1100";
-    map_hex['D'] = (unsigned char *)"1101";
-    map_hex['E'] = (unsigned char *)"1110";
-    map_hex['F'] = (unsigned char *)"1111";
-
-    unsigned char *res = new unsigned char[64];
     for(int i=0; i<16; i++){
-        memcpy(res + i*4, map_hex[text[i]], 4);
+        memcpy(res + i*4, MAP_HEX[text[i]], 4);
     }
-
-    return res;
 } 
-unsigned char *DES::binaryToHex(unsigned char *text)
+void DES::binaryToHex(unsigned char *text, unsigned char *res)
 {
-    map<unsigned long, unsigned char> map_bin;
-    map_bin[0] = (unsigned char)'0';
-	map_bin[1] = (unsigned char)'1';
-	map_bin[2] = (unsigned char)'2';
-	map_bin[3] = (unsigned char)'3';
-	map_bin[4] = (unsigned char)'4';
-	map_bin[5] = (unsigned char)'5';
-	map_bin[6] = (unsigned char)'6';
-	map_bin[7] = (unsigned char)'7';
-	map_bin[8] = (unsigned char)'8';
-	map_bin[9] = (unsigned char)'9';
-	map_bin[10] = (unsigned char)'A';
-	map_bin[11] = (unsigned char)'B';
-	map_bin[12] = (unsigned char)'C';
-	map_bin[13] = (unsigned char)'D';
-	map_bin[14] = (unsigned char)'E';
-	map_bin[15] = (unsigned char)'F';
-
-    unsigned char *temp = new unsigned char[5];
-    unsigned char *res = new unsigned char[17];
+    unsigned char *temp = (unsigned char *) malloc(sizeof(unsigned char) * 5);
     memset(temp, '\0', sizeof(unsigned char) * 5);
     for(int i = 0; i < 16; i++){
         memcpy(temp, text + i*4, 4);
-        res[i] = map_bin[bitset<4>(temp).to_ulong()];
+        res[i] = MAP_BIN[bitset<4>(temp).to_ulong()];
     }
-    return res;
+    free(temp);
 } 
 /* ======== END ::: UTILITY METHOD ======== */
 
 /* ======== START ::: ENCRYPT KEY ======== */
-unsigned char *DES::permuteKeyWithParity(const unsigned char *key)
+void DES::permuteKeyWithParity(const unsigned char *key, unsigned char *res)
 {
-    unsigned char *res = new unsigned char[56];
     for(int i=0; i<56; i++){
         res[i] = key[this->KEY_PARITY[i]-1];
     }
-
-    return res;
 } 
-unsigned char *DES::shiftLeft(unsigned char *temp, int round)
+void DES::shiftLeft(unsigned char *res, int round)
 {
-    unsigned char *res = new unsigned char[28];
+    unsigned char *temp = (unsigned char *) malloc(sizeof(unsigned char) * 28);
     
     for(int i = 0; i < this->AMOUNT_SHIFT_PER_ROUND[round]; i++){
-        // cout << "BEFORE SHIFT " << i << " ::: " << temp << endl;
+        // cout << "BEFORE SHIFT " << i << " ::: " << res << endl;
         int j = 1;
         for(; j < 28; j++){
-            res[j-1] = temp[j];
+            temp[j-1] = res[j];
         }
-        // make the new res as new temp 
-        res[j-1] = temp[0];
-        memset(temp, '\0', sizeof(unsigned char) * 28);
-        memcpy(temp, res, 28);
+        // make the new temp as new res 
+        temp[j-1] = res[0];
+        memset(res, '\0', sizeof(unsigned char) * 28);
+        memcpy(res, temp, 28);
     }
-    return res;
+    free(temp);
 } 
-unsigned char *DES::permuteKeyWithKeyComposition(const unsigned char *key)
+void DES::permuteKeyWithKeyComposition(const unsigned char *key, unsigned char *res)
 {
-    unsigned char *res = new unsigned char[48];
     for(int i=0; i<48; i++){
         res[i] = key[this->INITIAL_PERMUTATION_TABLE[i]-1];
     }
-
-    return res;
 } 
 /* ======== END ::: ENCRYPT KEY ======== */
 
 /* ======== START ::: ENCRYPT & DECRYPT ======== */
-unsigned char *DES::permuteTextWithParity(const unsigned char *text)
+void DES::permuteTextWithParity(const unsigned char *text, unsigned char *res)
 {
-    unsigned char *res = new unsigned char[64];
     for(int i=0; i<64; i++){
         res[i] = text[this->TEXT_PARITY[i]-1];
     }
-
-    return res;
 } 
-unsigned char *DES::permuteWithExpTab(unsigned char *text)
+void DES::permuteWithExpTab(unsigned char *text, unsigned char *res)
 {
-    unsigned char *res = new unsigned char[48];
     for(int i=0; i<48; i++){
         res[i] = text[this->EXPANSION_TABLE[i]-1];
     }
-
-    return res;
 } 
-unsigned char *DES::xorOperation(unsigned char *text1, unsigned char *text2, uint size)
+void DES::xorOperation(unsigned char *text1, unsigned char *text2, uint size, unsigned char *res)
 {
-    unsigned char *res = new unsigned char[size];
-
     for(int i=0; i<size; i++){
         res[i] = text1[i] != text2[i] ? '1' : '0';
     }
-
-    return res;
 }
-unsigned char *DES::permuteWithPermutationTab(const unsigned char *text)
+
+void DES::permuteWithPermutationTab(const unsigned char *text, unsigned char *res)
 {
-    unsigned char *res = new unsigned char[32];
     for(int i=0; i<32; i++){
         res[i] = text[this->PERMUTATION_TABLE[i]-1];
     }
-
-    return res;
 } 
-unsigned char *DES::permuteWithFinalPermutationTab(unsigned char *text)
+void DES::permuteWithFinalPermutationTab(unsigned char *text, unsigned char *res)
 {
-    unsigned char *res = new unsigned char[64];
     for(int i=0; i<64; i++){
         res[i] = text[this->INVERSE_PERMUTATION_TABLE[i]-1];
     }
-
-    return res;
 } 
 /* ======== END ::: ENCRYPT & DECRYPT ======== */
 
 void DES::generateSubKeys(const unsigned char *key)
 {
     // 1. make key from hex to binary 
-    unsigned char *binaryKey = hexToBinary((unsigned char *)key);
+    unsigned char *binaryKey = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    hexToBinary((unsigned char *)key, binaryKey);
 
     // 2. initial permutation 
-    unsigned char *ipRes = permuteKeyWithParity(binaryKey); 
+    unsigned char *ipRes = (unsigned char *) malloc(sizeof(unsigned char) * 56);
+    permuteKeyWithParity(binaryKey, ipRes); 
 
     // 3. splitting to LPT and RPT 
-    unsigned char *lpt = new unsigned char[28];
-    unsigned char *rpt = new unsigned char[28];
+    unsigned char *lpt = (unsigned char *) malloc(sizeof(unsigned char) * 28);
+    unsigned char *rpt = (unsigned char *) malloc(sizeof(unsigned char) * 28);
     memcpy(lpt, ipRes, 28);
     memcpy(rpt, ipRes + 28, 28);
 
     // 4. key transformation
+    unsigned char *combine = (unsigned char *) malloc(sizeof(unsigned char) * 56);
     for(int i=0; i<16; i++){
         // shift left 
-        lpt = shiftLeft(lpt, i);
-        rpt = shiftLeft(rpt, i);
+        shiftLeft(lpt, i);
+        shiftLeft(rpt, i);
 
-        unsigned char *combine = new unsigned char[56];
         memcpy(combine, lpt, 28);
         memcpy(combine + 28, rpt, 28);
 
         // get round keys from compression permutation (from 56 bits to 48 bits)
-        unsigned char *compressedKey = permuteKeyWithKeyComposition(combine);
+        unsigned char *compressedKey = new unsigned char[48];
+        permuteKeyWithKeyComposition(combine, compressedKey);
         this->compressedKeysBin[i] = compressedKey;
     }
+    free(binaryKey);
+    free(ipRes);
+    free(combine);
+    free(lpt);
+    free(rpt);
 }
 unsigned char *DES::encryptBlock(unsigned char *plainText, const unsigned char *key)
 {
@@ -349,10 +343,12 @@ unsigned char *DES::encryptBlock(unsigned char *plainText, const unsigned char *
     }
 
     // 1. make text from hex to binary 
-    unsigned char *binaryText = hexToBinary(plainText);
+    unsigned char *binaryText = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    hexToBinary(plainText, binaryText);
     
     // 2. initial permutation for text 
-    unsigned char *permutatedText = permuteTextWithParity(binaryText);
+    unsigned char *permutatedText = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    permuteTextWithParity(binaryText, permutatedText);
 
     // 3. split text 
     unsigned char *lpt = new unsigned char[32];
@@ -361,12 +357,15 @@ unsigned char *DES::encryptBlock(unsigned char *plainText, const unsigned char *
     unsigned char *rpt = new unsigned char[32];
     memcpy(rpt, permutatedText + 32, 32);
 
+    unsigned char *rptExpanded = (unsigned char *) malloc(sizeof(unsigned char) * 48);
+    unsigned char *permutedSBox = (unsigned char *) malloc(sizeof(unsigned char) * 32);
     for(int i=0; i<16; i++){
+        unsigned char *xored = (unsigned char *) malloc(sizeof(unsigned char) * 48);
         // 4. expand with D-Box (from 32 bits to 48 bits)
-        unsigned char *rptExpanded = permuteWithExpTab(rpt);
+        permuteWithExpTab(rpt, rptExpanded);
 
         // xor with compressed binary key from same round 
-        unsigned char *xored = xorOperation(this->compressedKeysBin[i], rptExpanded, 48);        
+        xorOperation(this->compressedKeysBin[i], rptExpanded, 48, xored);        
         
         /*
             res of 48 bits divided to 8 equal parts and passed trough 8 sub boxes(each is 6 bits).
@@ -397,9 +396,9 @@ unsigned char *DES::encryptBlock(unsigned char *plainText, const unsigned char *
             sBoxRes += char(val + '0');
         }
 
-        unsigned char *permutedSBox = permuteWithPermutationTab((unsigned char*)sBoxRes.c_str());
+        permuteWithPermutationTab((unsigned char*)sBoxRes.c_str(), permutedSBox);
 
-        xored = xorOperation(permutedSBox, lpt, 32);
+        xorOperation(permutedSBox, lpt, 32, xored);
 
         lpt = xored;
 
@@ -408,49 +407,52 @@ unsigned char *DES::encryptBlock(unsigned char *plainText, const unsigned char *
             lpt = rpt;
             rpt = temp;
         }
+
     }
+    free(rptExpanded);
+    free(permutedSBox);
  
-    unsigned char *fullText = new unsigned char[64];
+    unsigned char *fullText = (unsigned char *) malloc(sizeof(unsigned char) * 64);
     memcpy(fullText, lpt, 32);
     memcpy(fullText + 32, rpt, 32);
 
-    unsigned char *cipherTextBin = permuteWithFinalPermutationTab(fullText);
-    unsigned char *cipherText = binaryToHex(cipherTextBin);
+    unsigned char *cipherTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    permuteWithFinalPermutationTab(fullText, cipherTextBin);
+    unsigned char *cipherText = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+    binaryToHex(cipherTextBin, cipherText);
 
+    free(binaryText);
+    free(permutatedText);
+    free(lpt);
+    free(rpt);
+    free(fullText);
+    free(cipherTextBin);
     return cipherText;
 }
 unsigned char *DES::decryptBlock(unsigned char *cipherText, const unsigned char *key)
 {
     int size = 16;
-    // for(int i=0; i<16;i++){
-    //     cout << this->compressedKeysBin[i] << endl;
-    // }
     
     // reverse round keys 
     flipRoundKeys();
 
-    // cout<< "reversed" << endl;
-    // for(int i=0; i<16;i++){
-    //     cout << this->compressedKeysBin[i] << endl;
-    // }
-
     return encryptBlock(cipherText, key);
 }
 
-unsigned char *DES::charToHex(const unsigned char *text) {
+void DES::charToHex(const unsigned char *text, unsigned char *res) {
     unsigned char *hex = new unsigned char[16];
     unsigned char *binary = new unsigned char[64];
     for (int i = 0; i < 8; i++) {
         memcpy(binary + (i * 8), bitset<8>(text[i]).to_string().c_str(), 8);
     }
-    return binaryToHex(binary);
+    binaryToHex(binary, res);
 }
 
-unsigned char *DES::hexToChar(unsigned char *text) {
-    unsigned char *binary = hexToBinary(text);
+void DES::hexToChar(unsigned char *text, unsigned char *res) {
+    unsigned char *binary = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    hexToBinary(text, binary);
     
     string temp = "";
-    unsigned char *res = new unsigned char[8];
     for (int i = 0; i < 64; i++) {
         temp += binary[i];
         if((i + 1) % 8 == 0) {
@@ -458,20 +460,19 @@ unsigned char *DES::hexToChar(unsigned char *text) {
             temp = "";
         }
     }
-    return res;
+    free(binary);
 }
 
-unsigned char *DES::encryptCBC(unsigned char *plainText, uint lenPlainText, const unsigned char *key)
+unsigned char *DES::encryptCBC(unsigned char *plainText, uint lenPlainText)
 {
-
-    // cout << plainText << " " << lenPlainText << " " << key << endl;
+    const unsigned char *key = this->KEY;
 
     uint fix_len = uint(ceil(float(lenPlainText)/float(8))*8);
-    unsigned char* plainTextFixed = new unsigned char[fix_len];
+    unsigned char* plainTextFixed = (unsigned char*) malloc(sizeof(unsigned char) * fix_len);
     memset(plainTextFixed, '\0', fix_len);
     memcpy(plainTextFixed, plainText, lenPlainText);
 
-    unsigned char *cipherText = new unsigned char[fix_len];
+    unsigned char *cipherText = (unsigned char*) malloc(sizeof(unsigned char) * fix_len);
     memset(cipherText, '\0', fix_len);
 
     unsigned char *xorer = new unsigned char[64];
@@ -481,47 +482,46 @@ unsigned char *DES::encryptCBC(unsigned char *plainText, uint lenPlainText, cons
         unsigned char *currentText = new unsigned char[8];
         memset(currentText, '\0', 8);
         memcpy(currentText, plainTextFixed+(i*8), 8);
-        cout << currentText << endl;
 
-        unsigned char *currentTextHex = charToHex(currentText);
-        unsigned char *currentTextBin = hexToBinary(currentTextHex);
+        unsigned char *currentTextHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+        charToHex(currentText, currentTextHex);
+        unsigned char *currentTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+        hexToBinary(currentTextHex, currentTextBin);
 
-        unsigned char *keyHex = charToHex(key);
+        unsigned char *keyHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+        charToHex(key, keyHex);
 
-        // TODO OI: XOR currentTextBin with xorer
-        unsigned char *xoredWithPlainTextBin =  xorOperation(currentTextBin, xorer, 64);
-        unsigned char *xoredWithPlainTextHex =  binaryToHex(xoredWithPlainTextBin);
-        cout << "currentTextBin " << currentTextBin << endl;
-        cout << "xorer          " << xorer << endl;
-        cout << "xoredBin       " << xoredWithPlainTextBin << endl;
-        cout << "xoredWithPlainTextHex " << xoredWithPlainTextHex << endl << endl;
-
-        // TODO OI: Encrypt xoredWithPlainTextHex
+        unsigned char *xoredWithPlainTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+        xorOperation(currentTextBin, xorer, 64, xoredWithPlainTextBin);
+        unsigned char *xoredWithPlainTextHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+        binaryToHex(xoredWithPlainTextBin, xoredWithPlainTextHex);
+        
         unsigned char *cipherTextHex = encryptBlock(xoredWithPlainTextHex, keyHex);
-        unsigned char *cipherTextBin = hexToBinary(cipherTextHex);
-        cout << "cipherTextHex       " << cipherTextHex << endl;
-        cout << "cipherTextBin       " << cipherTextBin << endl << endl;
+        unsigned char *cipherTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+        hexToBinary(cipherTextHex, cipherTextBin);
 
-        memcpy(cipherText+(i*8), hexToChar(cipherTextHex), 8);
+        unsigned char *cipherTextChar = (unsigned char *) malloc(sizeof(unsigned char) * 8);
+        hexToChar(cipherTextHex, cipherTextChar);
+        memcpy(cipherText+(i*8), cipherTextChar, 8);
         memcpy(xorer, cipherTextBin, 64);
     }
 
-    // cout << "cipherTextBin " << cipherText << endl;
-
+    free(plainTextFixed);
     return cipherText;
 }
 
-unsigned char *DES::decryptCBC(unsigned char *cipherText, uint lenCipherText, const unsigned char *key)
+unsigned char *DES::decryptCBC(unsigned char *cipherText, uint lenCipherText)
 {
-
+    const unsigned char *key = this->KEY;
     // cout << cipherText << " " << lenCipherText << " " << key << endl;
 
     uint fix_len = uint(ceil(float(lenCipherText)/float(8))*8);
-    unsigned char* cipherTextFixed = new unsigned char[fix_len];
+    unsigned char* cipherTextFixed = (unsigned char *) malloc(sizeof(unsigned char) * fix_len);
     memset(cipherTextFixed, '\0', fix_len);
-    memcpy(cipherTextFixed, cipherText, lenCipherText);
+    memcpy(cipherTextFixed, cipherText, fix_len);
+    
 
-    unsigned char *plainText = new unsigned char[fix_len];
+    unsigned char *plainText = (unsigned char*) malloc(sizeof(unsigned char) * fix_len);
     memset(plainText, '\0', fix_len);
 
     unsigned char *xorer = new unsigned char[64];
@@ -531,63 +531,151 @@ unsigned char *DES::decryptCBC(unsigned char *cipherText, uint lenCipherText, co
         unsigned char *currentText = new unsigned char[8];
         memset(currentText, '\0', 8);
         memcpy(currentText, cipherTextFixed+(i*8), 8);
-        // cout << currentText << endl;
 
-        unsigned char *currentTextHex = charToHex(currentText);
-        unsigned char *currentTextBin = hexToBinary(currentTextHex);
-        // cout << "currentTextHex      " << currentTextHex << endl;
-        // cout << "currentTextBin      " << currentTextBin << endl << endl;
+        unsigned char *currentTextHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+        charToHex(currentText, currentTextHex);
+        unsigned char *currentTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+        hexToBinary(currentTextHex, currentTextBin);
 
-        unsigned char *keyHex = charToHex(key);
+        unsigned char *keyHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+        charToHex(key, keyHex);
         
         // TODO OI: Decrypt cipher text
-        cout << "currentTextHex      " << currentTextHex << endl;
+        // cout << "currentTextHex      " << currentTextHex << endl;
         unsigned char *decryptedTextHex = decryptBlock(currentTextHex, keyHex);
-        unsigned char *decryptedTextBin = hexToBinary(decryptedTextHex);
-        cout << "decryptedTextHex    " << decryptedTextHex << endl;
-        // cout << "decryptedTextBin    " << decryptedTextBin << endl << endl;
+        unsigned char *decryptedTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+        hexToBinary(decryptedTextHex, decryptedTextBin);
+        // cout << "decryptedTextHex    " << decryptedTextHex << endl;
         
         // TODO OI: XOR currentTextBin with xorer
-        unsigned char *xoredWithPlainTextBin = xorOperation(decryptedTextBin, xorer, 64);
-        unsigned char *xoredWithPlainTextHex = binaryToHex(xoredWithPlainTextBin);
-        // cout << "decryptedTextBin      " << decryptedTextBin << endl;
-        // cout << "xorer                 " << xorer << endl;
-        // cout << "xoredBin              " << xoredWithPlainTextBin << endl;
-        // cout << "xoredWithPlainTextHex " << xoredWithPlainTextHex << endl << endl;
-        // cout << "currentTextBin " << currentTextBin << endl;
-        // cout << "xorer " << xorer << endl;
-        // cout << "xoredWithPlainText " << xoredWithPlainText << endl;
+        unsigned char *xoredWithPlainTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+        xorOperation(decryptedTextBin, xorer, 64, xoredWithPlainTextBin);
+        unsigned char *xoredWithPlainTextHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+        binaryToHex(xoredWithPlainTextBin, xoredWithPlainTextHex);
 
-        memcpy(plainText+(i*8), hexToChar(xoredWithPlainTextHex), 8);
+        unsigned char *plainTextChar = (unsigned char *) malloc(sizeof(unsigned char) * 8);
+        hexToChar(xoredWithPlainTextHex, plainTextChar);
+        memcpy(plainText+(i*8), plainTextChar, 8);
         memcpy(xorer, currentTextBin, 64);
-
-        // cout << "decryptedTextBin " << decryptedTextBin << endl;
-        // cout << "xorer " << xorer << endl;
-        // cout << endl;
     }
 
-    // cout << "plainText " << plainText << endl;
+    free(cipherTextFixed);
+    return plainText;
+}
 
+unsigned char *DES::encryptCBC_Continous(unsigned char *plainText, uint lenPlainText)
+{
+    const unsigned char *key = this->KEY;
+
+    uint fix_len = uint(ceil(float(lenPlainText)/float(8))*8);
+    unsigned char* plainTextFixed = (unsigned char*) malloc(sizeof(unsigned char) * fix_len);
+    memset(plainTextFixed, '\0', fix_len);
+    memcpy(plainTextFixed, plainText, fix_len);
+
+    unsigned char *cipherText = (unsigned char*) malloc(sizeof(unsigned char) * fix_len);
+    memset(cipherText, '\0', fix_len);
+
+    unsigned char *currentText = (unsigned char*) malloc(sizeof(unsigned char) * 8);
+    unsigned char *currentTextHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+    unsigned char *currentTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    unsigned char *keyHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+    unsigned char *xoredWithPlainTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    unsigned char *xoredWithPlainTextHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+    unsigned char *cipherTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    unsigned char *cipherTextChar = (unsigned char *) malloc(sizeof(unsigned char) * 8);
+    for(int i = 0; i < ceil(float(lenPlainText)/float(8)); i++) {
+        memset(currentText, '\0', 8);
+        memcpy(currentText, plainTextFixed+(i*8), 8);
+        // cout << currentText << endl;
+
+        charToHex(currentText, currentTextHex);
+        hexToBinary(currentTextHex, currentTextBin);
+
+        charToHex(key, keyHex);
+
+        xorOperation(currentTextBin, CBC_XORER, 64, xoredWithPlainTextBin);
+        binaryToHex(xoredWithPlainTextBin, xoredWithPlainTextHex);
+
+        unsigned char *cipherTextHex = encryptBlock(xoredWithPlainTextHex, keyHex);
+        hexToBinary(cipherTextHex, cipherTextBin);
+        
+        hexToChar(cipherTextHex, cipherTextChar);
+        memcpy(cipherText+(i*8), cipherTextChar, 8);
+        memcpy(CBC_XORER, cipherTextBin, 64);
+    }
+    free(currentText);
+    free(currentTextHex);
+    free(currentTextBin);
+    free(keyHex);
+    free(xoredWithPlainTextBin);
+    free(xoredWithPlainTextHex);
+    free(cipherTextBin);
+    free(cipherTextChar);
+    free(plainTextFixed);
+    return cipherText;
+}
+
+unsigned char *DES::decryptCBC_Continous(unsigned char *cipherText, uint lenCipherText)
+{
+    const unsigned char *key = this->KEY;
+
+    uint fix_len = uint(ceil(float(lenCipherText)/float(8))*8);
+    unsigned char* cipherTextFixed = (unsigned char*) malloc(sizeof(unsigned char) * fix_len);
+    memset(cipherTextFixed, '\0', fix_len);
+    memcpy(cipherTextFixed, cipherText, fix_len);
+
+    unsigned char *plainText = (unsigned char*) malloc(sizeof(unsigned char) * fix_len);
+    memset(plainText, '\0', fix_len);
+
+    unsigned char *currentText = (unsigned char*) malloc(sizeof(unsigned char) * 8);
+    unsigned char *currentTextHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+    unsigned char *currentTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    unsigned char *keyHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+    unsigned char *decryptedTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    unsigned char *xoredWithPlainTextBin = (unsigned char *) malloc(sizeof(unsigned char) * 64);
+    unsigned char *xoredWithPlainTextHex = (unsigned char *) malloc(sizeof(unsigned char) * 16);
+    unsigned char *plainTextChar = (unsigned char *) malloc(sizeof(unsigned char) * 8);
+    for(int i = 0; i < ceil(float(lenCipherText)/float(8)); i++) {
+        memset(currentText, '\0', 8);
+        memcpy(currentText, cipherTextFixed+(i*8), 8);
+
+        charToHex(currentText, currentTextHex);
+        hexToBinary(currentTextHex, currentTextBin);
+
+        charToHex(key, keyHex);
+        
+        unsigned char *decryptedTextHex = decryptBlock(currentTextHex, keyHex);
+        hexToBinary(decryptedTextHex, decryptedTextBin);
+        
+        xorOperation(decryptedTextBin, CBC_XORER, 64, xoredWithPlainTextBin);
+        binaryToHex(xoredWithPlainTextBin, xoredWithPlainTextHex);
+
+        hexToChar(xoredWithPlainTextHex, plainTextChar);
+        memcpy(plainText+(i*8), plainTextChar, 8);
+        memcpy(CBC_XORER, currentTextBin, 64);
+    }
+    free(currentText);
+    free(currentTextHex);
+    free(currentTextBin);
+    free(keyHex);
+    free(decryptedTextBin);
+    free(xoredWithPlainTextBin);
+    free(xoredWithPlainTextHex);
+    free(plainTextChar);
+    free(cipherTextFixed);
     return plainText;
 }
 
 void DES::flipRoundKeys()
 {
     int size = 16;
-    // for(int i=0; i<16;i++){
-    //     cout << this->compressedKeysBin[i] << endl;
-    // }
-    // reverse round keys 
-    unsigned char *temp = new unsigned char[48];
+
+    unsigned char *temp = (unsigned char *) malloc(sizeof(unsigned char) * 48);
     for(int i=0, j=size-1; i<size/2; i++, j--){
         memcpy(temp, this->compressedKeysBin[i], 48);
         memcpy(this->compressedKeysBin[i], this->compressedKeysBin[j], 48);
         memcpy(this->compressedKeysBin[j], temp, 48);
     }
     this->isDecrypting = !this->isDecrypting;
-    // cout<< "reversed" << endl;
-    // for(int i=0; i<16;i++){
-    //     cout << this->compressedKeysBin[i] << endl;
-    // }
-
+    free(temp);
 }
