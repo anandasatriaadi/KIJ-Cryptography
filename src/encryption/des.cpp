@@ -13,7 +13,7 @@ class DES {
         bool isDecrypting;
         const uint BLOCK_LEN = 8;
         
-        const unsigned char *KEY = (const unsigned char*)"4KUK0NT0";
+        const unsigned char *KEY = (const unsigned char*)"4KUK4NT0";
         unsigned char *IV = (unsigned char*)"0010000001111001011000010110111001100111001000000110001001100001";
         unsigned char *CBC_XORER = new unsigned char[64];
 

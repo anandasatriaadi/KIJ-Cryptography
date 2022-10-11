@@ -246,13 +246,13 @@ void sendEncryptCommand(int client)
     RC4 rc4_decrypt = RC4();
     unsigned char data_buffer[FILE_SEND_BUF];
     chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+    unsigned char *decrypted_data = (unsigned char *) malloc(FILE_SEND_BUF);
     while (1) {
         bzero(data_buffer, FILE_SEND_BUF);
         ret_rec = recv(client, data_buffer, FILE_SEND_BUF, 0);
         fflush(stdout);
         if (ret_rec != -1) {
             // Decrypt the data
-            unsigned char *decrypted_data = (unsigned char *) malloc(FILE_SEND_BUF);
             rc4_decrypt.encrypt(data_buffer, decrypted_data, FILE_SEND_BUF);
             
             if (total_bytes_received + ret_rec < fileSize) {
@@ -264,10 +264,10 @@ void sendEncryptCommand(int client)
                 break;
             }
             
-            free(decrypted_data);
         }
         bzero(data_buffer, FILE_SEND_BUF);
     }
+    free(decrypted_data);
     chrono::steady_clock::time_point end = chrono::steady_clock::now();
     fclose(newFile);
 
