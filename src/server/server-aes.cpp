@@ -18,6 +18,8 @@ int create_tcp_server_socket();
 void checkFile();
 void sendEncryptCommand(int client);
 
+AES aes = AES();
+
 int main()
 {
     fd_set read_fd_set;
@@ -203,31 +205,50 @@ void checkFile()
         mkdir("./files", 0777);
 }
 
+string exec(const char* cmd) {
+    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) return "ERROR";
+    char buffer[128];
+    std::string result = "";
+    while (!feof(pipe.get())) {
+        if (fgets(buffer, 128, pipe.get()) != NULL)
+            result += buffer;
+    }
+    return result;
+}
+
 /*
 Receiving encrypted file
 */
 void sendEncryptCommand(int client)
 {
     int ret_rec;
-    char fileName[FILE_SEND_BUF], fileSizeStr[FILE_SEND_BUF], filePath[FILE_SEND_BUF * 2];
+    char fileName[FILE_SEND_BUF], fileSizeStr[FILE_SEND_BUF], filePath[FILE_SEND_BUF * 2], fileCheckSum[FILE_SEND_BUF];
 
     // receive file name
     ret_rec = recv(client, fileName, sizeof(fileName), 0);
-    printf("Name of the file: %s\n", fileName);
+    printf("[!] Name of the file: %s\n", fileName);
     sprintf(filePath, "./files/%s", fileName);
 
     // receive file size
     ret_rec = recv(client, fileSizeStr, FILE_SEND_BUF, 0);
     unsigned long fileSize = (unsigned long)atoi(fileSizeStr);
-    printf("Size of the file: %s\n", fileSizeStr);
+    printf("[!] Size of the file: %s\n", fileSizeStr);
+
+    // receive file checksum
+    ret_rec = recv(client, fileCheckSum, FILE_SEND_BUF, 0);
+    printf("[!] File checksum: %s\n", fileCheckSum);
+    cout << endl;
 
     // make file
     FILE *newFile = fopen(filePath, "w+");
     int counter = 0;
     uint total_bytes_received = 0;
 
-    AES aes = AES();
+    aes.resetIV();
+
     unsigned char data_buffer[FILE_SEND_BUF];
+    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
     while (1) {
         bzero(data_buffer, FILE_SEND_BUF);
         ret_rec = recv(client, data_buffer, FILE_SEND_BUF, 0);
@@ -235,7 +256,7 @@ void sendEncryptCommand(int client)
         if (ret_rec != -1) {
             // Decrypt the data
             unsigned char *decrypted_data = (unsigned char *) malloc(FILE_SEND_BUF);
-            decrypted_data = aes.decryptCBC_Continous(data_buffer, FILE_SEND_BUF);
+             aes.decryptCBC_Continous(data_buffer, decrypted_data, FILE_SEND_BUF);
             
             if (total_bytes_received + ret_rec < fileSize) {
                 fwrite(decrypted_data, sizeof(char), ret_rec, newFile);
@@ -250,5 +271,17 @@ void sendEncryptCommand(int client)
         }
         bzero(data_buffer, FILE_SEND_BUF);
     }
+    chrono::steady_clock::time_point end = chrono::steady_clock::now();
     fclose(newFile);
+
+    cout << "[!] DONE Receiving - Decrypting - Writing" << endl;
+    cout << "[!] Time elapsed = " << chrono::duration_cast<chrono::microseconds>(end - begin).count() << " µs" << endl;
+
+    // check file checksum
+    string checkSum = exec(("md5sum " + string(filePath)).c_str());
+    if (checkSum.substr(0, 32) == string(fileCheckSum)) {
+        cout << "[!] Checksum is correct" << endl;
+    } else {
+        cout << "[!] Checksum is incorrect" << endl;
+    }
 }

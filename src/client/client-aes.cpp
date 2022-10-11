@@ -25,6 +25,7 @@ using namespace std;
 void recieveInput(const char *title, char str[]);
 void printWarn(const char *msg);
 void sendEncrypt(int server);
+AES aes = AES();
 
 int main()
 {
@@ -103,26 +104,29 @@ void printWarn(const char *msg)
     printf("\e[31m%s\e[0m\n", msg);
 }
 
+string exec(const char* cmd) {
+    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) return "ERROR";
+    char buffer[128];
+    std::string result = "";
+    while (!feof(pipe.get())) {
+        if (fgets(buffer, 128, pipe.get()) != NULL)
+            result += buffer;
+    }
+    return result;
+}
+
 void sendEncrypt(int server)
 {
     // Pointer to the file to be read from
     FILE *fptr1;
 
-    // for reading bytes from the file
-    int fgetcReturn;
-    unsigned char c;
-
     unsigned char buffer[FILE_SEND_BUF];
-    unsigned char flag[FILE_SEND_BUF] = "done";
     char fileName[FILE_SEND_BUF], filePath[FILE_SEND_BUF * 2];
-    char fileExt[4];
-
-    // Stores the bytes to read
-    int i = 0, j = 0, from = 0, to = 10000;
 
     // If the file exists and has read permission
     system("echo 'List of files '; ls -la files");
-    recieveInput("Insert file name", fileName);
+    recieveInput("[!] Insert file name", fileName);
     sprintf(filePath, "./files/%s", fileName);
     fptr1 = fopen(filePath, "r");
     if (fptr1 == NULL) {
@@ -136,21 +140,32 @@ void sendEncrypt(int server)
 
     // send file size
     unsigned long fileSize = filesystem::file_size(filePath);
-    printf("file size: %lu\n", fileSize);
+    printf("[!] File size: %lu\n", fileSize);
     send(server, to_string(fileSize).c_str(), FILE_SEND_BUF, 0);
 
-    int counter = 0;
+    // send file checksum
+    string fileCheckSum = exec(("md5sum " + string(filePath)).c_str());
+    unsigned char fileCheckSumChar[FILE_SEND_BUF];
+    memccpy(fileCheckSumChar, fileCheckSum.c_str(), ' ', 32);
+    printf("[!] File checksum: %s\n", fileCheckSumChar);
+    send(server, fileCheckSumChar, FILE_SEND_BUF, 0);
 
-    AES aes = AES();
+    aes.resetIV();
+
     unsigned char data_buffer[FILE_SEND_BUF];
+    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
     while (fread(data_buffer, sizeof(unsigned char), FILE_SEND_BUF, fptr1) > 0) {
         // Encrypt the data
         unsigned char *encrypted_data = (unsigned char *) malloc(FILE_SEND_BUF);
-        encrypted_data = aes.encryptCBC_Continous(data_buffer, FILE_SEND_BUF);
+        aes.encryptCBC_Continous(data_buffer, encrypted_data, FILE_SEND_BUF);
         // Send the encrypted data
         send(server, encrypted_data, FILE_SEND_BUF, 0);
         free(encrypted_data);
+        bzero(data_buffer, FILE_SEND_BUF);
     }
-
+    chrono::steady_clock::time_point end = chrono::steady_clock::now();
     fclose(fptr1);
+
+    cout << "[!] DONE Read - Encrypting - Sending" << endl;
+    cout << "[!] Time elapsed = " << chrono::duration_cast<chrono::microseconds>(end - begin).count() << " µs" << endl;
 }

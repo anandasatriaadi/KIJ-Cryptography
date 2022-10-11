@@ -24,6 +24,21 @@ class AES {
         // const unsigned char *IV = new unsigned char [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76];
         // const unsigned char *KEY = new unsigned char [0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8];
 
+        unsigned char MUL_CONSTANT[4][4] = {
+            {0x02, 0x03, 0x01, 0x01},
+            {0x01, 0x02, 0x03, 0x01},
+            {0x01, 0x01, 0x02, 0x03},
+            {0x03, 0x01, 0x01, 0x02}};
+
+        unsigned char INV_MUL_CONSTANT[4][4] = {
+            {0x0E, 0x0B, 0x0D, 0x09},
+            {0x09, 0x0E, 0x0B, 0x0D},
+            {0x0D, 0x09, 0x0E, 0x0B},
+            {0x0B, 0x0D, 0x09, 0x0E},
+        };
+        
+        const unsigned char RC_LIST[10+1]{0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36};
+
         const unsigned char SBOX[16][16] = {
             {0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76},
             {0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0},
@@ -92,8 +107,8 @@ class AES {
         unsigned char *decryptCBC(unsigned char *cipherText, uint lenCipherText);
 
         // More Utils
-        unsigned char *encryptCBC_Continous(unsigned char *plainText, uint lenPlainText);
-        unsigned char *decryptCBC_Continous(unsigned char *cipherText, uint lenCipherText);
+        void encryptCBC_Continous(unsigned char *plainText, unsigned char *cipherText, uint lenPlainText);
+        void decryptCBC_Continous(unsigned char *cipherText, unsigned char *plainText, uint lenCipherText);
         void resetIV();
 };
     
@@ -164,7 +179,7 @@ void AES::subBytes(unsigned char **input){
 
 void AES::shiftRow(unsigned char **input, int rowNumber, int shift)
 {
-    unsigned char tempRow[4];
+    unsigned char *tempRow = (unsigned char*) malloc(4 * sizeof(unsigned char));
 
     for (int i = 0; i < 4; i++) {
         tempRow[i] = input[rowNumber][(i + shift) % 4];
@@ -172,6 +187,7 @@ void AES::shiftRow(unsigned char **input, int rowNumber, int shift)
     for (int i = 0; i < 4; i++) {
         input[rowNumber][i] = tempRow[i];
     }
+    free(tempRow);
 }
 
 void AES::shiftRows(unsigned char **input)
@@ -183,12 +199,6 @@ void AES::shiftRows(unsigned char **input)
 
 void AES::mixColumns(unsigned char **input)
 {
-    unsigned char mul_constant[4][4] = {
-        {0x02, 0x03, 0x01, 0x01},
-        {0x01, 0x02, 0x03, 0x01},
-        {0x01, 0x01, 0x02, 0x03},
-        {0x03, 0x01, 0x01, 0x02}};
-
     // First loops through the initial state
     unsigned char **result = generate2DUC(4, 4);
     for (int i = 0; i < 4; i++) {
@@ -198,12 +208,12 @@ void AES::mixColumns(unsigned char **input)
             unsigned char temp2 = 0;
             // cout << "|";
             for (int k = 0; k < 4; k++) {
-                if (mul_constant[j][k] == 0x01) {
+                if (MUL_CONSTANT[j][k] == 0x01) {
                     temp2 ^= input[k][i];
                 } else {
                     temp2 ^= mulBy2(input[k][i]);
                     
-                    if (mul_constant[j][k] == 0x03) {
+                    if (MUL_CONSTANT[j][k] == 0x03) {
                         temp2 ^= input[k][i];
                     }
                 }
@@ -217,6 +227,7 @@ void AES::mixColumns(unsigned char **input)
             input[i][j] = result[i][j];
         }
     }
+    delete[] result;
 }
 // ======== END ::: ENCRYPTION PART ========
 
@@ -237,14 +248,6 @@ void AES::invShiftRows(unsigned char **input) {
 
 void AES::invMixColumns(unsigned char **input) {
     // BME
-    // print2dUC(input, 4, 4);
-    unsigned char mul_constant[4][4] = {
-        {0x0E, 0x0B, 0x0D, 0x09},
-        {0x09, 0x0E, 0x0B, 0x0D},
-        {0x0D, 0x09, 0x0E, 0x0B},
-        {0x0B, 0x0D, 0x09, 0x0E},
-    };
-
     // First loops through the initial state
     unsigned char **result = generate2DUC(4, 4);
     for (int i = 0; i < 4; i++) {
@@ -253,7 +256,7 @@ void AES::invMixColumns(unsigned char **input) {
         for (int j = 0; j < 4; j++) {
             unsigned char temp = 0;
             for (int k = 0; k < 4; k++) {
-                temp ^= invMultiply(input[k][i], mul_constant[j][k]);
+                temp ^= invMultiply(input[k][i], INV_MUL_CONSTANT[j][k]);
             }
             result[j][i] = temp;
         }
@@ -264,7 +267,7 @@ void AES::invMixColumns(unsigned char **input) {
             input[i][j] = result[i][j];
         }
     }
-
+    delete[] result;
 }
 
 
@@ -272,8 +275,11 @@ void AES::invMixColumns(unsigned char **input) {
 
 void AES::keyExpansion(const unsigned char *key, unsigned char **keyRounds) {
     // cout << this->N_COLUMN << endl;
-    unsigned char word[4]; // words
-    unsigned char rc[4] = {0, 0, 0, 0};
+    // unsigned char word[4]; // words
+    unsigned char *word = (unsigned char*) malloc(4 * sizeof(unsigned char));
+    // unsigned char rc[4] = {0, 0, 0, 0};
+    unsigned char *rc = (unsigned char*) malloc(4 * sizeof(unsigned char));
+    memset(rc, 0, 4);
 
     // Assign the key to first round of keyRounds
     // alias, keyRounds[0] = key
@@ -305,7 +311,6 @@ void AES::keyExpansion(const unsigned char *key, unsigned char **keyRounds) {
 
         // Cari RCON
         {
-            const unsigned char RC_LIST[N_ROUND+1]{0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36};
             rc[0] = RC_LIST[i-1];
         }
 
@@ -330,6 +335,8 @@ void AES::keyExpansion(const unsigned char *key, unsigned char **keyRounds) {
             }
         }
     }
+    free(word);
+    free(rc);
 }
 
 void AES::addRoundKey(unsigned char **state, unsigned char *roundKey){
@@ -376,6 +383,8 @@ void AES::encryptBlock(unsigned char *plainText, uint blockNum, unsigned char **
             cipherText[index] = state[i][j];
         }
     }
+
+    delete[] state;
 }
 
 void AES::decryptBlock(unsigned char *cipherText, uint blockNum, unsigned char **keyRounds, unsigned char *plainText){
@@ -409,6 +418,8 @@ void AES::decryptBlock(unsigned char *cipherText, uint blockNum, unsigned char *
             plainText[index] = state[i][j];
         }
     }
+
+    delete[] state;
 }
 
 // ======== START ::: OPERATION MODE ========
@@ -510,17 +521,18 @@ void printHex(unsigned char *data, int len) {
     printf("\n");
 }
 
-unsigned char *AES::encryptCBC_Continous(unsigned char *plainText, uint lenPlainText){
+void AES::encryptCBC_Continous(unsigned char *plainText, unsigned char *cipherText, uint lenPlainText){
     // Copy plainText
-    unsigned char plainTextCopy[lenPlainText];
+    // unsigned char plainTextCopy[lenPlainText];
+    unsigned char *plainTextCopy = (unsigned char *) malloc(lenPlainText);
     memcpy(plainTextCopy, plainText, sizeof(unsigned char) * lenPlainText);
 
     unsigned char **keyRounds = generate2DUC(N_ROUND+1, N_BLOCK*4);
     keyExpansion(KEY, keyRounds);
 
     uint fix_len = uint(ceil(float(lenPlainText)/float(16))*16);
-    unsigned char *cipherText = new unsigned char[fix_len];
-    memset(cipherText, '\0', sizeof(unsigned char) * fix_len);
+    // unsigned char *cipherText = new unsigned char[fix_len];
+    // memset(cipherText, '\0', sizeof(unsigned char) * fix_len);
     
     unsigned char *temp = new unsigned char[BLOCK_LEN];
     for(uint blockNum = 0; blockNum < fix_len/16; blockNum++){
@@ -529,26 +541,25 @@ unsigned char *AES::encryptCBC_Continous(unsigned char *plainText, uint lenPlain
         memcpy(CBC_XORER, cipherText + (blockNum * BLOCK_LEN), BLOCK_LEN);
     }
     
+    free(plainTextCopy);
     delete[] keyRounds;
-    return cipherText;
+    // return cipherText;
 }
 
-unsigned char *AES::decryptCBC_Continous(unsigned char *cipherText, uint lenCipherText){
+void AES::decryptCBC_Continous(unsigned char *cipherText, unsigned char* plainText, uint lenCipherText){
     unsigned char **keyRounds = generate2DUC(N_ROUND+1, N_BLOCK*4);
     keyExpansion(KEY, keyRounds);
 
     uint fix_len = uint(ceil(float(lenCipherText)/float(16))*16);
-    unsigned char *decryptedCT = new unsigned char[fix_len];
-    memset(decryptedCT, '\0', sizeof(unsigned char) * fix_len);
 
     for(uint blockNum = 0; blockNum < fix_len/16; blockNum++){
-        decryptBlock(cipherText, blockNum, keyRounds, decryptedCT);
-        xorBlock(decryptedCT, blockNum, CBC_XORER);
+        decryptBlock(cipherText, blockNum, keyRounds, plainText);
+        xorBlock(plainText, blockNum, CBC_XORER);
         memcpy(CBC_XORER, cipherText + (blockNum * BLOCK_LEN), BLOCK_LEN);
     }
     
     delete[] keyRounds;
-    return decryptedCT;
+    // return decryptedCT;
 }
 
 // ======== END ::: OPERATION MODE ========
